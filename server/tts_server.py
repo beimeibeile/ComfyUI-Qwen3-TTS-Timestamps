@@ -155,7 +155,7 @@ class Engine:
         from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
         path = os.path.join(self.model_root, "Qwen3-ASR", ALIGNER_NAME)
         if not (os.path.isdir(path) and os.listdir(path)):
-            raise HTTPException(500, f"ForcedAligner 模型不存在: {path}（首次使用会自动下载）")
+            raise HTTPException(500, f"ForcedAligner 模型不存在: {path}（请先手动放置该模型）")
         print(f"[engine] 加载 ForcedAligner <- {path}", flush=True)
         t0 = time.time()
         a = Qwen3ForcedAligner.from_pretrained(

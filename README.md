@@ -56,9 +56,12 @@ ComfyUI-Qwen3-TTS-Timestamps/
    ```bat
    D:\Ai\ComfyUI-aki-v3.2\python\python.exe -m pip install "qwen-tts==0.1.1" "qwen-asr==0.0.6" "transformers==4.57.3" fastapi uvicorn soundfile requests
    ```
-2. **模型**（首次使用自动下载到 ComfyUI/models/，也可手动放置）：
+2. **模型**（放在 ComfyUI/models/ 下即可，服务端只做存在性检查、不自动下载）：
    - `models/Qwen3-TTS/Qwen3-TTS-12Hz-1.7B-CustomVoice`（约 3.83GB）
    - `models/Qwen3-TTS/Qwen3-TTS-12Hz-1.7B-VoiceDesign`
+   - `models/Qwen3-TTS/Qwen3-TTS-12Hz-1.7B-Base`（voice_clone 克隆用）
+   - `models/Qwen3-ASR/Qwen3-ForcedAligner-0.6B`（对齐用，可 ModelScope 手动拉取）
+   - 已存在即直接加载，缺失时服务端报错并提示完整路径。
    - `models/Qwen3-TTS/Qwen3-TTS-12Hz-1.7B-Base`（voice_clone 克隆用）
    - `models/Qwen3-ASR/Qwen3-ForcedAligner-0.6B`（对齐用）
 3. **节点**：将本目录复制到 `ComfyUI/custom_nodes/ComfyUI-Qwen3-TTS-Timestamps/`，重启 ComfyUI。
