@@ -1,0 +1,20 @@
+[project]
+name = "ComfyUI-Qwen3-TTS-Timestamps"
+version = "1.0.0"
+description = "Qwen3-TTS with word-level timestamps (ForcedAligner) for ComfyUI. DBW series node package."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "qwen-tts==0.1.1",
+    "qwen-asr==0.0.6",
+    "fastapi",
+    "uvicorn",
+    "soundfile",
+    "librosa",
+    "numpy",
+    "torch",
+    "transformers==4.57.3",
+]
+
+[tool.setuptools]
+packages = ["server"]

@@ -1,0 +1,19 @@
+# runtime logs / pid
+_tts_*.log
+_tts_pid.txt
+
+# registered voices (personal data + large .pt prompt files)
+server/voices/
+server/voices.json
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# models (downloaded on demand to ComfyUI/models/)
+models/
+
+# ide
+.idea/
+.vscode/
