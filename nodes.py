@@ -43,13 +43,13 @@ _PRESET_VOICES = [
 
 
 def _voice_options():
-    """voice 下拉允许值: 9 预置 + 已注册克隆音色(server/voices.json)。
+    """voice 下拉允许值: 空串(voice_design 清空/未选) + 9 预置 + 已注册克隆音色(server/voices.json)。
 
     每次 INPUT_TYPES 调用时生成 → 节点定义列表始终为当前有效值,
     避免 ComfyUI 前端 combo 校验把列表外的值判为"无效输入"
     (后端校验注释明确 combo 由前端处理; 前端校验读取节点定义列表)。
     """
-    opts = list(_PRESET_VOICES)
+    opts = [""] + list(_PRESET_VOICES)
     try:
         vf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server", "voices.json")
         if os.path.exists(vf):
