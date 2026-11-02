@@ -32,10 +32,22 @@ const refreshVoice = async (node) => {
     if (!typeW || !voiceW || !voiceW.options) return;
 
     const mode = typeW.value;
-    // voice_design 无需选择音色 → 清空并禁用
+    // voice_design 无需选择音色 → 清空值并禁用(列表保留 [""] 保证 ComfyUI 校验通过)
     if (mode === "voice_design") {
-        if (Array.isArray(voiceW.options.values)) voiceW.options.values.length = 0;
-        else voiceW.options.values = [];
+        if (Array.isArray(voiceW.options.values)) {
+            voiceW.options.values.length = 0;
+            voiceW.options.values.push("");
+        } else {
+            voiceW.options.values = [""];
+        }
+        if (voiceW.value !== "") {
+            if (typeof voiceW.setValue === "function") {
+                voiceW.setValue("", { node, canvas: app.canvas });
+            } else {
+                voiceW.value = "";
+            }
+            if (typeof voiceW.callback === "function") voiceW.callback("");
+        }
         if (voiceW.disabled !== true) voiceW.disabled = true;
         node.setDirtyCanvas?.(true, true);
         return;

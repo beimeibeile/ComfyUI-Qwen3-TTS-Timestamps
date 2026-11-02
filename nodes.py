@@ -35,6 +35,32 @@ _LANGUAGES = [
 # 生成模式
 _VOICE_TYPES = ["custom_voice", "voice_clone", "voice_design"]
 
+# 9 个预置音色(与服务端 PRESET_SPEAKERS 一致)
+_PRESET_VOICES = [
+    "aiden", "dylan", "eric", "ono_anna", "ryan",
+    "serena", "sohee", "uncle_fu", "vivian",
+]
+
+
+def _voice_options():
+    """voice 下拉允许值: 9 预置 + 已注册克隆音色(server/voices.json)。
+
+    每次 INPUT_TYPES 调用时生成 → 节点定义列表始终为当前有效值,
+    避免 ComfyUI 前端 combo 校验把列表外的值判为"无效输入"
+    (后端校验注释明确 combo 由前端处理; 前端校验读取节点定义列表)。
+    """
+    opts = list(_PRESET_VOICES)
+    try:
+        vf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server", "voices.json")
+        if os.path.exists(vf):
+            with open(vf, "r", encoding="utf-8") as f:
+                for name in json.load(f).keys():
+                    if name and name not in opts:
+                        opts.append(name)
+    except Exception:
+        pass
+    return opts
+
 
 # ---------------------------------------------------------------------------
 # HTTP / 工具
@@ -138,7 +164,7 @@ class Qwen3TTSWithTimestamps:
                 "tts_text": ("STRING", {"multiline": True, "default": "你好，欢迎使用 Qwen3-TTS 同源时间戳合成。", "placeholder": "输入待合成文本(方言/情绪通过指令控制)"}),
                 "server_url": ("STRING", {"default": _DEFAULT_SERVER}),
                 "voice_type": (_VOICE_TYPES, {"default": "custom_voice", "tooltip": "custom_voice=预置音色+指令; voice_clone=克隆注册音色; voice_design=文字设计音色+指令"}),
-                "voice": ([""], {"tooltip": "custom_voice: 预置音色(9种); voice_clone: 已注册克隆音色; voice_design: 无需选择"}),
+                "voice": (_voice_options(), {"tooltip": "custom_voice: 预置音色(9种); voice_clone: 已注册克隆音色; voice_design: 无需选择"}),
                 "instruct": ("STRING", {"default": "", "tooltip": "方言/情绪/语速指令, 如: 四川话，情绪激动，泣不成声，放慢语速"}),
                 "language": (_LANGUAGES, {"default": "Auto"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 2**31 - 1}),
