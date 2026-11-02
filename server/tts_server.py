@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -336,6 +337,16 @@ def build_srt(text: str, words: List[Dict[str, Any]], fallback_chars: int = 16) 
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Qwen3-TTS-Timestamps", version="1.0.0")
 
+# 浏览器前端(ComfyUI 页面 8188)跨域访问 /spks 等只读接口必须放行 CORS,
+# 否则主节点 voice 下拉的前端 fetch 会被浏览器拦截(节点后端执行不受影响)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -363,10 +374,7 @@ def health():
 @app.get("/spks")
 def list_spks():
     voices = _load_voices()
-    registered = [
-        {"name": n, "mode": "voice_clone", "ref_text": v.get("ref_text", "")}
-        for n, v in voices.items()
-    ]
+    registered = [n for n in voices]  # 字符串数组, 与 /register 响应一致(前端下拉直接使用)
     # 预置音色：优先缓存；custom_voice 已加载时动态补充
     presets = PRESET_SPEAKERS
     if not presets and engine and engine.current_type == "custom_voice":
