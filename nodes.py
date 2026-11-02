@@ -183,6 +183,19 @@ class Qwen3TTSWithTimestamps:
                 "temperature": ("FLOAT", {"default": 0.9, "min": 0.1, "max": 2.0, "step": 0.1}),
                 "repetition_penalty": ("FLOAT", {"default": 1.05, "min": 1.0, "max": 2.0, "step": 0.05}),
             },
+            "optional": {
+                # 后端握手参数: 运行时下发给 8001 服务端动态应用(照 CosyVoice TTS With Timestamps 模式),
+                # 空/0=不干预(用服务端启动参数)。服务端懒加载: 模型未加载/空闲超时卸载后,
+                # 本次合成请求自动触发加载(HTTP 长超时兜底等待), 无需重启服务。
+                "device": (
+                    ["", "auto", "cuda", "cpu"],
+                    {"default": "", "tooltip": "后端模型加载设备(运行时切换, 无需重启服务): 空=不干预(用服务端启动参数);\ncpu=内存加载(不占显存); cuda=显存加载; auto=有 CUDA 自动用 GPU。\n切换会卸载并重载模型(本次合成含加载耗时)"},
+                ),
+                "idle_timeout": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": 86400, "tooltip": "后端空闲自动卸载秒数: 0=不干预(用服务端启动参数, 默认 0 常驻)。\n服务常驻, 空闲超时自动卸载模型释放显存, 下次请求自动重载"},
+                ),
+            },
         }
 
     RETURN_TYPES = ("AUDIO", "STRING", "STRING", "FLOAT")
@@ -191,7 +204,8 @@ class Qwen3TTSWithTimestamps:
     CATEGORY = _CATEGORY
 
     def generate(self, tts_text, server_url, voice_type="custom_voice", voice="", instruct="",
-                 language="Auto", seed=0, max_new_tokens=1024, top_p=1.0, temperature=0.9, repetition_penalty=1.05):
+                 language="Auto", seed=0, max_new_tokens=1024, top_p=1.0, temperature=0.9,
+                 repetition_penalty=1.05, device="", idle_timeout=0):
         if not tts_text or not tts_text.strip():
             raise ValueError("[Qwen3TTS] tts_text 为空，请输入待合成文本")
 
@@ -207,6 +221,11 @@ class Qwen3TTSWithTimestamps:
             "temperature": float(temperature),
             "repetition_penalty": float(repetition_penalty),
         }
+        # 后端握手: 仅显式指定才下发(空/0=不干预服务端启动参数), 与 CosyVoice 节点语义一致
+        if device:
+            payload["device"] = device
+        if int(idle_timeout) > 0:
+            payload["idle_timeout"] = float(int(idle_timeout))
         result = _post_json(server_url, payload, path="/synth")
         if "audio_base64" not in result:
             raise RuntimeError(f"[Qwen3TTS] 服务端错误: {result}")
@@ -234,6 +253,12 @@ class Qwen3TTSRegisterVoice:
                 "ref_text": ("STRING", {"default": "", "multiline": True, "tooltip": "参考音频的转写文本(克隆 ICL 必需, 必须与音频内容一致, 否则对齐会漂移)"}),
                 "server_url": ("STRING", {"default": _DEFAULT_SERVER}),
             },
+            "optional": {
+                "device": (
+                    ["", "auto", "cuda", "cpu"],
+                    {"default": "", "tooltip": "后端模型加载设备(注册会触发 base 模型加载): 空=不干预(用服务端启动参数)"},
+                ),
+            },
         }
 
     RETURN_TYPES = ("STRING", "STRING")
@@ -241,7 +266,7 @@ class Qwen3TTSRegisterVoice:
     FUNCTION = "register"
     CATEGORY = _CATEGORY
 
-    def register(self, name, ref_audio, ref_text, server_url=_DEFAULT_SERVER):
+    def register(self, name, ref_audio, ref_text, server_url=_DEFAULT_SERVER, device=""):
         name = (name or "").strip()
         if not name:
             raise ValueError("[Qwen3TTS] 音色名不能为空")
@@ -260,7 +285,10 @@ class Qwen3TTSRegisterVoice:
         sf.write(buf, audio_np, sr, format="WAV")
         wav_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
-        result = _post_json(server_url, {"name": name, "ref_audio": wav_b64, "ref_text": ref_text.strip()}, path="/register", timeout=120)
+        payload = {"name": name, "ref_audio": wav_b64, "ref_text": ref_text.strip()}
+        if device:  # 后端握手: 仅显式指定才下发
+            payload["device"] = device
+        result = _post_json(server_url, payload, path="/register", timeout=120)
         voices = result.get("voices", [])
         return (f"注册成功: {name}", json.dumps(voices, ensure_ascii=False))
 

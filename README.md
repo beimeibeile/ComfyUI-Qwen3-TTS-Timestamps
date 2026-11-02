@@ -19,6 +19,11 @@ ComfyUI 节点 (nodes.py) ──HTTP──> FastAPI 服务 (server/tts_server.py
 - 三种 voice_type 按需切换，切换时自动卸载旧模型（懒加载 + idle 超时卸载，显存友好）。
 - 音色注册（RegisterVoice）扩展为「参考音频 + ref_text 转写」：注册时用 Base 模型
   `create_voice_clone_prompt` 预计算克隆 prompt 并落盘，合成时直接复用，无需每次重算。
+- **后端握手参数（照 CosyVoice TTS With Timestamps 模式）**：主节点与 Register 节点
+  可运行时下发给 8001 服务端 `device`（模型加载设备，cuda/cpu/auto，切换=卸载+按新设备重载）
+  与 `idle_timeout`（空闲自动卸载秒数）——无需重启服务；空/0=不干预（用服务端启动参数）。
+  懒启动规则：服务常驻、模型按需加载，节点合成请求即触发加载/重载，HTTP 长超时兜底等待，
+  模型空闲超时自动卸载释放显存，下次请求自动重载。
 
 ## 目录结构
 
@@ -40,10 +45,13 @@ ComfyUI-Qwen3-TTS-Timestamps/
 
 | 节点 | 输入 | 输出 |
 |---|---|---|
-| `DBW-Qwen3TTS-TTSWithTimestamps` | text / server_url / voice_type / voice / instruct / language / seed / max_new_tokens / top_p / temperature / repetition_penalty | AUDIO / WORD_TIMESTAMPS / SRT / DURATION_SECONDS |
-| `DBW-Qwen3TTS-RegisterVoice` | name + ref_audio(AUDIO) + ref_text(必填) | ok / voices |
+| `DBW-Qwen3TTS-TTSWithTimestamps` | text / server_url / voice_type / voice / instruct / language / seed / max_new_tokens / top_p / temperature / repetition_penalty / **device\* / idle_timeout\*** | AUDIO / WORD_TIMESTAMPS / SRT / DURATION_SECONDS |
+| `DBW-Qwen3TTS-RegisterVoice` | name + ref_audio(AUDIO) + ref_text(必填) + **device\*** | ok / voices |
 | `DBW-Qwen3TTS-DeleteVoice` | name | ok / voices |
 | `DBW-Qwen3TTS-SRTFileWriter` | srt(纯连线 forceInput) + filename_prefix | 写盘路径 |
+
+\* optional 后端握手参数：`device`（["",auto,cuda,cpu]，空=不干预用服务端启动参数，切换=卸载并重载）、
+`idle_timeout`（INT 0-86400，0=不干预用服务端启动参数）。仅显式指定才随请求下发。
 
 - `voice_type` 联动：custom_voice → 9 个预置音色下拉；voice_clone → 已注册音色下拉；
   voice_design → 音色下拉清空禁用（用 instruct 文字设计音色）。
@@ -75,11 +83,16 @@ ComfyUI-Qwen3-TTS-Timestamps/
 
 | 接口 | 方法 | 说明 |
 |---|---|---|
-| `/health` | GET | 服务状态 |
+| `/health` | GET | 服务状态（status/device/**lazy**/**idle_timeout**/**model_loaded**/model_type/voices/presets） |
 | `/spks` | GET | 预置 + 注册音色列表 |
-| `/register` | POST | name + ref_audio(base64 wav) + ref_text 注册克隆音色 |
+| `/register` | POST | name + ref_audio(base64 wav) + ref_text 注册克隆音色（可选 device） |
 | `/delete` | POST | name 删除注册音色 |
-| `/synth` | POST | text/voice_type/voice/instruct/language/seed/... → audio_base64(WAV)+sample_rate+word_timestamps+srt+duration_seconds |
+| `/synth` | POST | text/voice_type/voice/instruct/language/seed/...（可选 **device**/**idle_timeout**）→ audio_base64(WAV)+sample_rate+word_timestamps+srt+duration_seconds |
+
+- `/health.model_loaded=false` 表示模型未加载（懒启动等待中/空闲已卸载），服务常驻；
+  合成请求即触发自动加载，节点无需预检加载状态。
+- `/synth` 可选 `device`（auto/cuda/cpu，运行时动态切换，卸载+按新设备重载）与
+  `idle_timeout`（>0 时更新空闲卸载阈值并确保监控生效）——对应节点端后端握手参数。
 
 `/synth` 响应示例：
 ```json

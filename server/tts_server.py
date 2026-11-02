@@ -123,7 +123,8 @@ class SynthRequest(BaseModel):
     top_p: Optional[float] = None
     temperature: Optional[float] = None
     repetition_penalty: Optional[float] = None
-    device: str = ""                  # 空=服务端启动参数，cuda/cpu 需与启动一致
+    device: str = ""                  # 空=不干预(用服务端启动参数); auto/cuda/cpu 运行时动态切换(卸载+按新设备重载)
+    idle_timeout: float = 0           # 空/0=不干预(用服务端启动参数); >0 更新空闲自动卸载阈值
 
 
 class RegisterRequest(BaseModel):
@@ -152,6 +153,7 @@ class Engine:
         self.aligner: Any = None
         self.last_used = time.time()
         self._idle_thread: Optional[threading.Thread] = None
+        self._idle_stop = False
 
     # -- 加载 --
     def _load_tts(self, model_type: str):
@@ -210,24 +212,68 @@ class Engine:
             self.tts = None
             self.aligner = None
             self.current_type = None
-            if self.device.startswith("cuda"):
-                torch.cuda.empty_cache()
-        print("[engine] 模型已卸载（idle 超时）", flush=True)
+            torch.cuda.empty_cache()  # 无 CUDA 时为空操作, 无需按设备判断
+        print("[engine] 模型已卸载（idle 超时/设备切换）", flush=True)
 
     def start_idle_monitor(self):
         if self.idle_timeout <= 0:
             return
+        if self._idle_thread is not None and self._idle_thread.is_alive():
+            return  # 已在运行, 幂等(动态下发 >0 时复用)
         def loop():
-            while True:
+            while not self._idle_stop:
                 time.sleep(5)
                 if self.tts is not None or self.aligner is not None:
                     if time.time() - self.last_used > self.idle_timeout:
                         self.unload()
+        self._idle_stop = False
         self._idle_thread = threading.Thread(target=loop, daemon=True)
         self._idle_thread.start()
 
+    def set_idle_timeout(self, timeout: float):
+        """运行时更新空闲卸载阈值: >0 时确保监控线程在跑; <=0 时停止线程(服务常驻不卸载)."""
+        if timeout > 0:
+            if self.idle_timeout <= 0:
+                print(f"[engine] 空闲自动卸载阈值动态启用: {timeout:.0f}s", flush=True)
+            self.idle_timeout = timeout
+            self.start_idle_monitor()
+        else:
+            self._idle_stop = True
+            self.idle_timeout = 0
+            print("[engine] 空闲自动卸载已关闭(服务常驻)", flush=True)
+
+    def set_device(self, device: str):
+        """运行时切换模型加载设备(cuda<->cpu): 卸载已加载模型, 下次请求按新设备重载.
+        auto 由调用方先归一为 cuda/cpu."""
+        if device == self.device:
+            return
+        print(f"[engine] 切换模型加载设备: {self.device} -> {device} (卸载后按新设备重载)", flush=True)
+        self.unload()
+        self.device = device
+
 
 engine: Optional[Engine] = None
+
+
+# ---------------------------------------------------------------------------
+# 后端握手: 节点按请求动态下发运行配置(照 CosyVoice TTS With Timestamps 模式)
+# ---------------------------------------------------------------------------
+def _apply_config(device: str = "", idle_timeout: float = 0):
+    """按请求动态调整后端运行配置, 无需重启服务:
+    - idle_timeout>0: 更新空闲自动卸载阈值并确保监控线程运行; 0=不干预;
+    - device 非空且不同于当前: 卸载已加载模型, 下次请求按新设备重载(auto 归一为 cuda/cpu)。
+    懒启动规则: 服务常驻但模型按需加载, 节点无需预检加载状态, 合成请求即触发
+    加载/重载(节点端 HTTP 长超时兜底等待)。"""
+    if engine is None:
+        return
+    if idle_timeout and idle_timeout > 0:
+        engine.set_idle_timeout(float(idle_timeout))
+    if device:
+        dev = device.strip().lower()
+        if dev == "auto":
+            dev = "cuda" if torch.cuda.is_available() else "cpu"
+        if dev in ("cuda", "cpu"):
+            engine.set_device(dev)
 
 
 # ---------------------------------------------------------------------------
@@ -382,9 +428,13 @@ app.router.lifespan_context = lifespan
 
 @app.get("/health")
 def health():
+    loaded = (engine.tts is not None or engine.aligner is not None) if engine else False
     return {
         "status": "ok",
         "device": engine.device if engine else "?",
+        "lazy": True,                                   # 引擎按需加载(idle 超时自动卸载), 服务常驻
+        "idle_timeout": engine.idle_timeout if engine else 0,
+        "model_loaded": loaded,                          # 当前是否已加载(未加载=懒启动等待中)
         "model_type": engine.current_type if engine else None,
         "voices": len(_load_voices()),
         "presets": PRESET_SPEAKERS,
@@ -407,6 +457,7 @@ def list_spks():
 
 @app.post("/register")
 def register_voice(req: RegisterRequest):
+    _apply_config(req.device, 0)  # 后端握手: 设备切换(注册会触发 base 模型加载)
     name = req.name.strip()
     if not name:
         raise HTTPException(400, "音色名不能为空")
@@ -474,6 +525,9 @@ def synth(req: SynthRequest):
     if req.voice_type not in QWEN3_MODEL_NAMES:
         raise HTTPException(400, f"voice_type 无效: {req.voice_type}")
 
+    # 后端握手: 先应用节点下发的运行配置(设备切换=卸载+下次按新设备重载; 空闲阈值更新)。
+    # 懒启动: 模型可能处于未加载/超时卸载状态, get_tts/get_aligner 会按需加载(节点 HTTP 长超时兜底等待)。
+    _apply_config(req.device, req.idle_timeout)
     tts = engine.get_tts(req.voice_type)
     aligner = engine.get_aligner()
 
