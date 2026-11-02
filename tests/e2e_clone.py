@@ -1,6 +1,6 @@
 # coding=utf-8
 """voice_clone 链路测试: synth 参考段 -> /register -> /synth voice_clone -> 对齐验证。
-运行: D:\Ai\ComfyUI-aki-v3.2\python\python.exe tests\e2e_clone.py
+运行: python tests\e2e_clone.py (python 不在 PATH 时用你的 python.exe 完整路径)
 """
 import base64
 import json

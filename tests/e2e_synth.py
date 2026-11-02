@@ -1,6 +1,6 @@
 # coding=utf-8
 """端到端测试: /synth custom_voice(预置音色+四川话指令) → 验证同源字级时间戳链路。
-运行: D:\Ai\ComfyUI-aki-v3.2\python\python.exe tests\e2e_synth.py
+运行: python tests\e2e_synth.py (python 不在 PATH 时用你的 python.exe 完整路径)
 """
 import json
 import sys

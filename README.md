@@ -55,9 +55,9 @@ ComfyUI-Qwen3-TTS-Timestamps/
 
 ## 安装
 
-1. **依赖**（与 ComfyUI 共用 python 环境）：
+1. **依赖**（与 ComfyUI 共用 python 环境；若 python 不在 PATH，用你的 python.exe 完整路径替换 `python`）：
    ```bat
-   D:\Ai\ComfyUI-aki-v3.2\python\python.exe -m pip install "qwen-tts==0.1.1" "qwen-asr==0.0.6" "transformers==4.57.3" fastapi uvicorn soundfile requests
+   python -m pip install "qwen-tts==0.1.1" "qwen-asr==0.0.6" "transformers==4.57.3" fastapi uvicorn soundfile requests
    ```
 2. **模型**（放在 ComfyUI/models/ 下即可，服务端只做存在性检查、不自动下载）：
    - `models/Qwen3-TTS/Qwen3-TTS-12Hz-1.7B-CustomVoice`（约 3.83GB）
@@ -95,9 +95,10 @@ ComfyUI-Qwen3-TTS-Timestamps/
 ## 测试
 
 ```bat
-D:\Ai\ComfyUI-aki-v3.2\python\python.exe tests\e2e_synth.py   :: custom_voice/voice_design 端到端
-D:\Ai\ComfyUI-aki-v3.2\python\python.exe tests\e2e_clone.py   :: voice_clone 注册→合成→清理
+python tests\e2e_synth.py   :: custom_voice/voice_design 端到端
+python tests\e2e_clone.py   :: voice_clone 注册→合成→清理
 ```
+（若 python 不在 PATH，用你的 python.exe 完整路径替换 `python`。）
 
 实测（本机）：
 - custom_voice（1.7B + 四川话指令）：约 17-18s/次（模型已缓存），21 字级时间戳，

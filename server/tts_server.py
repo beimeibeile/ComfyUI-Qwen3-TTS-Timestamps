@@ -32,7 +32,27 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 # 路径与常量
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL_ROOT = r"D:\Ai\ComfyUI-aki-v3.2\ComfyUI\models"
+def _default_model_root() -> str:
+    """模型根目录解析(不再硬编码本机路径, 公开仓库通用):
+    优先级: 环境变量 QWEN3_TTS_MODEL_ROOT > 相对位置探测(ComfyUI/models 等) > 兜底路径。
+    也可用命令行参数 --model_root 覆盖。
+    """
+    env = os.environ.get("QWEN3_TTS_MODEL_ROOT", "").strip()
+    if env:
+        return env
+    here = os.path.dirname(os.path.abspath(__file__))  # <工程>/server
+    candidates = [
+        os.path.normpath(os.path.join(here, "..", "..", "..", "models")),  # custom_nodes 安装: ComfyUI/models
+        os.path.normpath(os.path.join(here, "..", "..", "models")),        # <父目录>/models
+        os.path.normpath(os.path.join(here, "..", "models")),              # <工程>/models
+    ]
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return candidates[0]
+
+
+DEFAULT_MODEL_ROOT = _default_model_root()
 QWEN3_TTS_DIR = os.path.join(DEFAULT_MODEL_ROOT, "Qwen3-TTS")
 QWEN3_ASR_DIR = os.path.join(DEFAULT_MODEL_ROOT, "Qwen3-ASR")
 

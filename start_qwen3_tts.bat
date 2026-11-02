@@ -1,6 +1,11 @@
 @echo off
 chcp 936 >nul
-set PY=D:\Ai\ComfyUI-aki-v3.2\python\python.exe
+rem 指定 python.exe(需含 fastapi/uvicorn/soundfile/requests 等依赖)。
+rem 优先级: 环境变量 QWEN3_TTS_PY > PATH 中的 python。
+rem 示例(写入系统环境变量后即生效):
+rem   set QWEN3_TTS_PY=C:\path\to\python.exe
+set "PY=python"
+if defined QWEN3_TTS_PY set "PY=%QWEN3_TTS_PY%"
 set DIR=%~dp0
 cd /d %DIR%server
 echo [check] port 8001 ...
