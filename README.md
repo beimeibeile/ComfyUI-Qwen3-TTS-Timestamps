@@ -47,6 +47,9 @@ ComfyUI-Qwen3-TTS-Timestamps/
 
 - `voice_type` 联动：custom_voice → 9 个预置音色下拉；voice_clone → 已注册音色下拉；
   voice_design → 音色下拉清空禁用（用 instruct 文字设计音色）。
+- **instruct 按模式联动（前端）**：voice_clone（Base 模型）**无 instruct 通道**（qwen_tts 的
+  `generate_voice_clone` 不构建 instruct_ids），指令输入会被静默忽略，前端已禁用该输入框；
+  custom_voice / voice_design 的 instruct 是**软控制**（非硬约束）。
 - 注册/删除后前端自动刷新音色列表（executed 事件 + 20s 轮询 + 手动“刷新音色列表”按钮）。
 - SRT File Writer 的 `srt` 为纯连线输入，前端不渲染文本框（直接删除控件）。
 
@@ -110,10 +113,14 @@ D:\Ai\ComfyUI-aki-v3.2\python\python.exe tests\e2e_clone.py   :: voice_clone 注
    服务端已用 numpy 等效实现替换（日志可见 `已应用等效峰值归一补丁(-6 dBFS)`）。
 3. **对齐前提**：ForcedAligner 要求 transcript 与合成文本完全一致；长文本请保证
    max_new_tokens 足够，避免被截断导致对齐错位。
-4. **方言/情绪请走 instruct**：custom_voice 的 instruct（如“四川话，情绪激动”）
-   可注入口音与情绪；voice_clone 参考音频的方言/情绪会被过滤，只复制音色（Qwen3-TTS 官方行为）。
-5. **克隆音色中性化**：克隆仅迁移音色（声纹），参考源的方言、情绪、口音不会保留，
-   这是模型设计行为，不是缺陷。
+4. **方言/情绪走 instruct，但属软控制**：custom_voice 的 instruct（如“四川话，情绪激动”）
+   可注入口音与情绪，但 1.7B 模型是**软跟随**——方言“时有时无”主要来自采样随机
+   （seed 每次 randomize + temperature≈1 时波动大）。**想让方言稳定**：
+   `temperature ≤ 0.8` + `seed 固定`（不 randomize），必要时指令写全（“请用四川话朗读整段文本”）。
+   voice_clone 参考音频的方言/情绪会被过滤，只复制音色（Qwen3-TTS 官方行为）。
+5. **克隆音色中性化 + 无指令通道**：voice_clone 仅迁移音色（声纹），参考源的方言、情绪、
+   口音不会保留，且该模式**不支持任何 instruct**（模型接口无此参数，前端已禁用输入框）——
+   需要方言/情绪请改用 custom_voice 或 voice_design。
 6. **死循环防御**：text 为空/全空白直接报 400，不进入合成。
 7. **云备选**：若本地显存不足，可改用阿里云 Qwen3-TTS API（返回同源时间戳），
    本工程专注本地 ComfyUI 场景。

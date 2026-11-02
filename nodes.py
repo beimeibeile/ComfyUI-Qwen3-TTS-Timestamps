@@ -175,7 +175,7 @@ class Qwen3TTSWithTimestamps:
                 "server_url": ("STRING", {"default": _DEFAULT_SERVER}),
                 "voice_type": (_VOICE_TYPES, {"default": "custom_voice", "tooltip": "custom_voice=预置音色+指令; voice_clone=克隆注册音色; voice_design=文字设计音色+指令"}),
                 "voice": (_voice_options(), {"tooltip": "custom_voice: 预置音色(9种); voice_clone: 已注册克隆音色; voice_design: 无需选择"}),
-                "instruct": ("STRING", {"default": "", "tooltip": "方言/情绪/语速指令, 如: 四川话，情绪激动，泣不成声，放慢语速"}),
+                "instruct": ("STRING", {"default": "", "tooltip": "方言/情绪/语速指令, 如: 四川话，情绪激动，放慢语速。\n注意: voice_clone(克隆)模式模型无指令通道, 风格只来自参考音频(前端已禁用此框);\ncustom_voice/voice_design 为软控制, 方言想稳定建议 temperature≤0.8 + 固定 seed"}),
                 "language": (_LANGUAGES, {"default": "Auto"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 2**31 - 1}),
                 "max_new_tokens": ("INT", {"default": 1024, "min": 64, "max": 4096, "tooltip": "单次生成上限; 过大可能触发上游已知死循环 issue#68"}),

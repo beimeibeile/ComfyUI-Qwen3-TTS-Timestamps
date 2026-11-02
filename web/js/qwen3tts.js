@@ -23,6 +23,17 @@ const getTTSNodes = () => {
     return graph._nodes.filter((n) => TTS_CLASSES.includes(n.comfyClass));
 };
 
+// instruct 按模式联动: voice_clone(Base 模型)无 instruct 通道 → 禁用输入框, 消除"填了没效果"误导
+const refreshInstruct = (node) => {
+    if (!node || !node.widgets) return;
+    const typeW = node.widgets.find((w) => w.name === "voice_type");
+    const insW = node.widgets.find((w) => w.name === "instruct");
+    if (!typeW || !insW) return;
+    const disabled = typeW.value === "voice_clone";
+    if (insW.disabled !== disabled) insW.disabled = disabled;
+    if (disabled) node.setDirtyCanvas?.(true, true);
+};
+
 // 按 voice_type 填充对应音色列表; 服务异常时静默返回(由事件/轮询下次重试)
 const refreshVoice = async (node) => {
     if (!node || !node.widgets) return;
@@ -30,6 +41,8 @@ const refreshVoice = async (node) => {
     const typeW = node.widgets.find((w) => w.name === "voice_type");
     const voiceW = node.widgets.find((w) => w.name === "voice");
     if (!typeW || !voiceW || !voiceW.options) return;
+
+    refreshInstruct(node);  // 每次模式联动都同步 instruct 可用性
 
     const mode = typeW.value;
     // voice_design 无需选择音色 → 清空值并禁用(列表保留 [""] 保证 ComfyUI 校验通过)

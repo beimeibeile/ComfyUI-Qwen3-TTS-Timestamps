@@ -469,6 +469,14 @@ def synth(req: SynthRequest):
     if req.repetition_penalty is not None:
         gen_kwargs["repetition_penalty"] = req.repetition_penalty
 
+    # qwen_tts 库(0.1.1)未实现 seed: generate 签名无 seed 参数, 透传会被忽略 → 每次合成真随机,
+    # 方言/风格"时有时无"的直接根因。这里在调用前主动设置 torch RNG, 实现同 seed 同参数完全复现。
+    if req.seed is not None:
+        _seed = int(req.seed)
+        torch.manual_seed(_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(_seed)
+
     language = req.language or "Auto"
     try:
         t0 = time.time()
