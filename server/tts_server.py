@@ -250,7 +250,7 @@ def _wav_bytes_to_np(data: bytes) -> tuple:
 def _np_to_wav_bytes(audio: np.ndarray, sr: int) -> bytes:
     import soundfile as sf
     buf = io.BytesIO()
-    sf.write(buf, audio, sr, format="WAV")
+    sf.write(buf, audio, sr, format="WAV", subtype="PCM_16")
     return buf.getvalue()
 
 

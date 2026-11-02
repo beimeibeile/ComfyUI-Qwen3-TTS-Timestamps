@@ -86,9 +86,19 @@ def _fetch_voices(server_url):
 
 
 def _decode_audio_base64(b64: str) -> torch.Tensor:
-    """服务端返回 float32 WAV bytes -> ComfyUI AUDIO waveform [1,1,T]"""
-    raw = np.frombuffer(base64.b64decode(b64), dtype=np.float32)
-    return torch.from_numpy(raw).reshape(1, 1, -1).float()
+    """服务端返回标准 WAV bytes -> ComfyUI AUDIO waveform [1,1,T]
+
+    必须按 WAV 解析(soundfile): 服务端写入 PCM_16(2 字节/样本)+44 字节头,
+    若按裸 float32 流读会把头部当波形、2 字节样本错拼 4 字节 → 时长减半(加速)+波形畸变。
+    """
+    import io
+    import soundfile as sf
+    raw = base64.b64decode(b64)
+    audio, _ = sf.read(io.BytesIO(raw), dtype="float32", always_2d=False)
+    audio = np.asarray(audio, dtype=np.float32)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)  # 多声道取平均为单声道
+    return torch.from_numpy(audio).reshape(1, 1, -1).float()
 
 
 # ---------------------------------------------------------------------------
